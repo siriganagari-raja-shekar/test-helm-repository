@@ -1,0 +1,37 @@
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+webappImage:
+  repository: rsiriganagari/webapp-cve-processor
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+dbMigrationImage:
+  repository: rsiriganagari/webapp-migration-cve-processor
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+secretRefs:
+  dockerHub: regcred
+  postgresPassword : postgres-password
+
+serverPort: 8000
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1024Mi
+  requests:
+    cpu: 1000m
+    memory: 1024Mi
+
+containerEnv:
+  POSTGRES_HOST: host.docker.internal # host.docker.internal is the default value for Docker Desktop. For other environments, this value should be changed.
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: csye7125
+  POSTGRES_USER: postgres
+  SERVER_PORT: 8000
+  CVE_ZIP_FILE_URL: https://github.com/CVEProject/cvelistV5/archive/refs/heads/main.zip

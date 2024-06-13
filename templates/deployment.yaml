@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "helm-webapp-cve-processor.fullname" . }}
+  labels:
+    {{- include "helm-webapp-cve-processor.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "helm-webapp-cve-processor.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "helm-webapp-cve-processor.labels" . | nindent 8 }}
+    spec:
+      imagePullSecrets: 
+        - name: {{ .Values.secretRefs.dockerHub }}
+      initContainers:
+        - name: database-migration
+          image: "{{ .Values.dbMigrationImage.repository }}:{{ .Values.dbMigrationImage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.dbMigrationImage.pullPolicy }}
+          args:
+            - "-url=jdbc:postgresql://{{ .Values.containerEnv.POSTGRES_HOST }}:{{ .Values.containerEnv.POSTGRES_PORT }}/{{ .Values.containerEnv.POSTGRES_DB }}"
+            - "-user={{ .Values.containerEnv.POSTGRES_USER }}"
+            - "-password=$(POSTGRES_PASSWORD)"
+            - "-schemas=cve"
+            - "migrate"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          ports:
+            - name: db-m-port
+              containerPort: {{ .Values.containerEnv.POSTGRES_PORT }}
+              hostPort: {{ .Values.containerEnv.POSTGRES_PORT }}
+              protocol: TCP
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretRefs.postgresPassword }}
+                  key: POSTGRES_PASSWORD 
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.webappImage.repository }}:{{ .Values.webappImage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.webappImage.pullPolicy }}
+          ports:
+            - name: application
+              containerPort: {{ .Values.serverPort }}
+              hostPort: {{ .Values.serverPort }}
+              protocol: TCP
+            - name: db
+              containerPort: {{ .Values.containerEnv.POSTGRES_PORT }}
+              hostPort: {{ .Values.containerEnv.POSTGRES_PORT }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            {{- range $key, $value := .Values.containerEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretRefs.postgresPassword }}
+                  key: POSTGRES_PASSWORD
+
